@@ -1,5 +1,6 @@
 package brave;
 
+import brave.internal.ExpiringClock;
 import brave.internal.Nullable;
 import brave.internal.Platform;
 import brave.internal.recorder.Recorder;
@@ -126,7 +127,7 @@ public final class Tracer {
     }
   }
 
-  final Clock clock;
+  final ExpiringClock clock;
   final Reporter<zipkin2.Span> reporter; // for toString
   final Recorder recorder;
   final Sampler sampler;
@@ -135,10 +136,10 @@ public final class Tracer {
   final AtomicBoolean noop;
   final boolean supportsJoin;
 
-  Tracer(Tracing.Builder builder, AtomicBoolean noop) {
+  Tracer(Tracing.Builder builder, ExpiringClock clock, AtomicBoolean noop) {
     this.noop = noop;
     this.supportsJoin = builder.supportsJoin && builder.propagationFactory.supportsJoin();
-    this.clock = builder.clock;
+    this.clock = clock;
     this.reporter = builder.reporter;
     this.recorder = new Recorder(builder.localEndpoint, clock, builder.reporter, this.noop);
     this.sampler = builder.sampler;
@@ -295,7 +296,7 @@ public final class Tracer {
   public Span toSpan(TraceContext context) {
     if (context == null) throw new NullPointerException("context == null");
     if (noop.get() == false && Boolean.TRUE.equals(context.sampled())) {
-      return RealSpan.create(context, clock, recorder);
+      return RealSpan.create(context, recorder);
     }
     return NoopSpan.create(context);
   }

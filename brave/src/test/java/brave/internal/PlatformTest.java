@@ -86,7 +86,7 @@ public class PlatformTest {
     };
 
     assertThat(platform.clock())
-        .hasToString("TickClock{baseEpochMicros=123000, tickNanos=456}");
+        .hasToString("TickClock{baseEpochMicros=123000, baseTickNanos=456}");
   }
 
   @Test public void reporter_hasNiceToString() {

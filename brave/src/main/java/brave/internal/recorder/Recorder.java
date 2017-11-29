@@ -1,7 +1,7 @@
 package brave.internal.recorder;
 
-import brave.Clock;
 import brave.Span;
+import brave.internal.ExpiringClock;
 import brave.internal.Nullable;
 import brave.propagation.TraceContext;
 import java.util.ArrayList;
@@ -18,7 +18,7 @@ public final class Recorder {
 
   public Recorder(
       Endpoint localEndpoint,
-      Clock clock,
+      ExpiringClock clock,
       Reporter<zipkin2.Span> reporter,
       AtomicBoolean noop
   ) {
@@ -36,6 +36,12 @@ public final class Recorder {
     MutableSpan span = spanMap.get(context);
     if (span == null) return null;
     return span.timestamp == 0 ? null : span.timestamp;
+  }
+
+  /** @see brave.Span#start() */
+  public void start(TraceContext context) {
+    if (noop.get()) return;
+    spanMap.getOrCreate(context).start();
   }
 
   /** @see brave.Span#start(long) */
@@ -56,6 +62,13 @@ public final class Recorder {
     if (noop.get()) return;
     if (kind == null) throw new NullPointerException("kind == null");
     spanMap.getOrCreate(context).kind(kind);
+  }
+
+  /** @see brave.Span#annotate(String) */
+  public void annotate(TraceContext context, String value) {
+    if (noop.get()) return;
+    if (value == null) throw new NullPointerException("value == null");
+    spanMap.getOrCreate(context).annotate(value);
   }
 
   /** @see brave.Span#annotate(long, String) */
@@ -82,6 +95,16 @@ public final class Recorder {
   }
 
   /** @see Span#finish() */
+  public void finish(TraceContext context) {
+    MutableSpan span = spanMap.remove(context);
+    if (span == null || noop.get()) return;
+    synchronized (span) {
+      span.finish(span.clock.currentTimeMicroseconds());
+      reporter.report(span.toSpan());
+    }
+  }
+
+  /** @see Span#finish(long) */
   public void finish(TraceContext context, long finishTimestamp) {
     MutableSpan span = spanMap.remove(context);
     if (span == null || noop.get()) return;

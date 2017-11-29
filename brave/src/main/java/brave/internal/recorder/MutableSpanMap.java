@@ -1,6 +1,7 @@
 package brave.internal.recorder;
 
 import brave.Clock;
+import brave.internal.ExpiringClock;
 import brave.internal.Nullable;
 import brave.propagation.TraceContext;
 import java.lang.ref.Reference;
@@ -31,13 +32,13 @@ final class MutableSpanMap extends ReferenceQueue<TraceContext> {
   // Eventhough we only put by RealKey, we allow get and remove by LookupKey
   final ConcurrentMap<Object, MutableSpan> delegate = new ConcurrentHashMap<>(64);
   final Endpoint localEndpoint;
-  final Clock clock;
+  final ExpiringClock clock;
   final Reporter<zipkin2.Span> reporter;
   final AtomicBoolean noop;
 
   MutableSpanMap(
       Endpoint localEndpoint,
-      Clock clock,
+      ExpiringClock clock,
       Reporter<zipkin2.Span> reporter,
       AtomicBoolean noop
   ) {
@@ -57,7 +58,7 @@ final class MutableSpanMap extends ReferenceQueue<TraceContext> {
     MutableSpan result = get(context);
     if (result != null) return result;
 
-    MutableSpan newSpan = new MutableSpan(context, localEndpoint);
+    MutableSpan newSpan = new MutableSpan(clock.fix(), context, localEndpoint);
     MutableSpan previousSpan = delegate.putIfAbsent(new RealKey(context, this), newSpan);
     if (previousSpan != null) return previousSpan; // lost race
     return newSpan;
@@ -78,7 +79,7 @@ final class MutableSpanMap extends ReferenceQueue<TraceContext> {
       MutableSpan value = delegate.remove(reference);
       if (value == null || noop.get()) continue;
       try {
-        value.annotate(clock.currentTimeMicroseconds(), "brave.flush");
+        value.annotate(value.clock.currentTimeMicroseconds(), "brave.flush");
         reporter.report(value.toSpan());
       } catch (RuntimeException e) {
         // don't crash the caller if there was a problem reporting an unrelated span.

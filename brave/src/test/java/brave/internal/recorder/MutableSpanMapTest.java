@@ -1,6 +1,7 @@
 package brave.internal.recorder;
 
 import brave.Tracing;
+import brave.internal.ExpiringClock;
 import brave.internal.Platform;
 import brave.propagation.TraceContext;
 import java.lang.ref.Reference;
@@ -20,7 +21,8 @@ public class MutableSpanMapTest {
   List<zipkin2.Span> spans = new ArrayList();
   TraceContext context = Tracing.newBuilder().build().tracer().newTrace().context();
   MutableSpanMap map =
-      new MutableSpanMap(localEndpoint, () -> 0L, spans::add, new AtomicBoolean(false));
+      new MutableSpanMap(localEndpoint, ExpiringClock.create(() -> 0L, 0L), spans::add,
+          new AtomicBoolean(false));
 
   @After public void close() {
     Tracing.current().close();
@@ -186,10 +188,11 @@ public class MutableSpanMapTest {
   /** We ensure that the implicit caller of reportOrphanedSpans doesn't crash on report failure */
   @Test
   public void reportOrphanedSpans_whenReporterDies() throws Exception {
-    MutableSpanMap map = new MutableSpanMap(localEndpoint, () -> 0, span ->
-    {
-      throw new RuntimeException("die!");
-    }, new AtomicBoolean(true));
+    MutableSpanMap map =
+        new MutableSpanMap(localEndpoint, ExpiringClock.create(() -> 0, 0L), span ->
+        {
+          throw new RuntimeException("die!");
+        }, new AtomicBoolean(true));
 
     // We drop the reference to the context, which means the next GC should attempt to flush it
     map.getOrCreate(context.toBuilder().build());

@@ -1,5 +1,6 @@
 package brave;
 
+import brave.internal.ExpiringClock;
 import brave.internal.Internal;
 import brave.internal.Nullable;
 import brave.internal.Platform;
@@ -279,14 +280,14 @@ public abstract class Tracing implements Closeable {
     final Propagation.Factory propagationFactory;
     final Propagation<String> stringPropagation;
     final CurrentTraceContext currentTraceContext;
-    final Clock clock;
+    final ExpiringClock clock;
 
     Default(Builder builder) {
-      this.tracer = new Tracer(builder, noop);
+      this.clock = ExpiringClock.create(builder.clock, 1_000_000);
+      this.tracer = new Tracer(builder, clock, noop);
       this.propagationFactory = builder.propagationFactory;
       this.stringPropagation = builder.propagationFactory.create(Propagation.KeyFactory.STRING);
       this.currentTraceContext = builder.currentTraceContext;
-      this.clock = builder.clock;
       maybeSetCurrent();
     }
 

@@ -2,6 +2,7 @@ package brave.internal.recorder;
 
 import brave.Span;
 import brave.Tracing;
+import brave.internal.ExpiringClock;
 import brave.internal.Platform;
 import brave.propagation.TraceContext;
 import java.util.ArrayList;
@@ -18,7 +19,8 @@ public class RecorderTest {
   List<zipkin2.Span> spans = new ArrayList();
   TraceContext context = Tracing.newBuilder().build().tracer().newTrace().context();
   Recorder recorder =
-      new Recorder(localEndpoint, () -> 0L, spans::add, new AtomicBoolean(false));
+      new Recorder(localEndpoint, ExpiringClock.create(() -> 0L, 0L), spans::add,
+          new AtomicBoolean(false));
 
   @After public void close() {
     Tracing.current().close();
